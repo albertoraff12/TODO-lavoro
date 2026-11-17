@@ -22,6 +22,11 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
 h1{margin:0;font-size:36px;letter-spacing:-1.2px;font-weight:700}
 .summary{color:var(--muted);font-size:14px}
+.tools{display:flex;align-items:center;gap:8px}
+.tools .ghost{padding:7px 12px;font-size:13px}
+.io{margin:-8px 0 14px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.io:empty{display:none}
+.io-err{color:var(--red)}
 .card{background:var(--card);border-radius:20px;padding:18px;box-shadow:0 2px 18px rgba(0,0,0,.04);margin-bottom:16px}
 input,select,button{font:inherit}
 input,select{border:0;background:var(--field);color:var(--text);border-radius:11px;padding:11px 12px;outline:none;min-width:0}
@@ -46,8 +51,8 @@ input:focus,select:focus,button:focus-visible{outline:3px solid rgba(0,122,255,.
 .badge{padding:1px 8px;border-radius:999px;background:var(--field);font-weight:600}
 .badge.progress{color:var(--orange)}
 .badge.done{color:var(--green)}
-.expired{color:var(--red);font-weight:600}
-.today{color:var(--orange);font-weight:600}
+.urgent{color:var(--red);font-weight:600}
+.soon{color:var(--orange);font-weight:600}
 .actions{display:flex;gap:4px}
 .icon{border:0;background:transparent;color:#aeaeb2;cursor:pointer;font-size:15px;border-radius:8px;padding:6px 8px}
 .icon:hover{color:var(--blue);background:var(--field)}
@@ -87,8 +92,14 @@ h2{margin:26px 0 12px;font-size:22px;letter-spacing:-.4px;display:flex;align-ite
 <div class="app">
 <header>
   <h1>TODO</h1>
-  <div id="summary" class="summary"></div>
+  <div class="tools">
+    <span id="summary" class="summary"></span>
+    <button class="ghost" id="expbtn" type="button" title="Salva tutte le attività e i progetti in un file">Esporta</button>
+    <button class="ghost" id="impbtn" type="button" title="Carica un file di backup">Importa</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+  </div>
 </header>
+<div id="io" class="io"></div>
 
 <section class="card">
   <form id="form" class="form">
@@ -140,8 +151,9 @@ function fmt(date){
 }
 function dl(t){
   if(t.status==="done"||!t.deadline)return "";
-  if(t.deadline<today())return "expired";
-  return t.deadline===today()?"today":"";
+  const diff=Math.round((new Date(t.deadline+"T12:00:00")-new Date(today()+"T12:00:00"))/86400000);
+  if(diff<=1)return "urgent";
+  return diff===2?"soon":"";
 }
 function opts(list,sel){return list.map(o=>`<option ${o===sel?"selected":""}>${o}</option>`).join("")}
 function findTask(id){
@@ -292,6 +304,73 @@ $("form").addEventListener("submit",e=>{
   $("text").value="";$("deadline").value="";
   save();render();
 });
+function ioMsg(t,err){$("io").innerHTML=t?`<span class="${err?"io-err":""}">${esc(t)}</span>`:""}
+let pending=null;
+function normTask(t){
+  if(!t||typeof t!=="object"||typeof t.title!=="string"||!t.title.trim())return null;
+  return {
+    id:Number.isFinite(t.id)?t.id:uid(),
+    title:t.title.trim().slice(0,100),
+    priority:t.priority==="Alta"?"Alta":"Normale",
+    deadline:/^\d{4}-\d{2}-\d{2}$/.test(t.deadline||"")?t.deadline:"",
+    status:STATUS.includes(t.status)?t.status:(t.done?"done":"todo")
+  };
+}
+function normData(d){
+  if(!d||typeof d!=="object"||!Array.isArray(d.tasks)||!Array.isArray(d.projects))return null;
+  return {
+    tasks:d.tasks.map(normTask).filter(Boolean),
+    projects:d.projects.filter(p=>p&&typeof p.title==="string"&&p.title.trim()).map(p=>({
+      id:Number.isFinite(p.id)?p.id:uid(),
+      title:p.title.trim().slice(0,80),
+      done:!!p.done,
+      open:p.open!==false,
+      subtasks:(Array.isArray(p.subtasks)?p.subtasks:[]).map(normTask).filter(Boolean)
+    }))
+  };
+}
+async function exportData(){
+  const data=JSON.stringify({app:"todo",version:1,exportedAt:new Date().toISOString(),tasks:tasks,projects:projects},null,2);
+  const name="todo-backup-"+today()+".json";
+  let dn=null;
+  try{if(window.claude&&window.claude.use)dn=await window.claude.use("downloads")}catch(e){}
+  if(dn){
+    try{await dn.save({filename:name,data});ioMsg("Backup salvato: "+name)}
+    catch(err){if(!err||err.code!=="declined")ioMsg("Impossibile salvare il file in questa vista.",true)}
+    return;
+  }
+  try{
+    const url=URL.createObjectURL(new Blob([data],{type:"application/json"}));
+    const a=document.createElement("a");
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    ioMsg("Backup esportato: "+name);
+  }catch(e){ioMsg("Esportazione non riuscita.",true)}
+}
+$("expbtn").addEventListener("click",exportData);
+$("impbtn").addEventListener("click",()=>$("file").click());
+$("file").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];
+  e.target.value="";
+  if(!f)return;
+  try{
+    const d=normData(JSON.parse(await f.text()));
+    if(!d)throw new Error("formato");
+    pending=d;
+    const subs=d.projects.reduce((n,p)=>n+p.subtasks.length,0);
+    $("io").innerHTML=`<span>File valido: ${d.tasks.length} attività, ${d.projects.length} progetti, ${subs} sotto-task. I dati attuali verranno sostituiti.</span>`+
+      `<button class="primary" data-io="apply" type="button">Sostituisci</button><button class="ghost" data-io="cancel" type="button">Annulla</button>`;
+  }catch(err){pending=null;ioMsg("File non valido: scegli un backup esportato da questa app.",true)}
+});
+$("io").addEventListener("click",e=>{
+  const b=e.target.closest("[data-io]");
+  if(!b)return;
+  if(b.dataset.io==="apply"&&pending){
+    tasks=pending.tasks;projects=pending.projects;editing=null;armed=null;
+    pending=null;save();render();ioMsg("Dati importati.");
+  }else{pending=null;ioMsg("")}
+});
+
 $("paddbtn").addEventListener("click",addProject);
 $("ptext").addEventListener("keydown",e=>{if(e.key==="Enter")addProject()});
 
