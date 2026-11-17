@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TODO</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#007aff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{
+  --bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--muted:#86868b;--line:#e5e5ea;--field:#f2f2f7;
+  --blue:#007aff;--green:#34c759;--orange:#ff9500;--red:#ff3b30;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue",Arial,sans-serif}
+.app{max-width:860px;margin:0 auto;padding:36px 24px 60px}
+header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
+h1{margin:0;font-size:36px;letter-spacing:-1.2px;font-weight:700}
+.summary{color:var(--muted);font-size:14px}
+.card{background:var(--card);border-radius:20px;padding:18px;box-shadow:0 2px 18px rgba(0,0,0,.04);margin-bottom:16px}
+input,select,button{font:inherit}
+input,select{border:0;background:var(--field);color:var(--text);border-radius:11px;padding:11px 12px;outline:none;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:3px solid rgba(0,122,255,.25)}
+.form{display:grid;grid-template-columns:1fr 120px 150px auto;gap:8px}
+.primary{border:0;background:var(--blue);color:#fff;border-radius:11px;padding:10px 18px;font-weight:600;cursor:pointer}
+.ghost{border:0;background:var(--field);color:var(--text);border-radius:11px;padding:10px 14px;cursor:pointer}
+.error{min-height:16px;margin-top:7px;font-size:12px;color:var(--red)}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:500}
+.tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.task{display:flex;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.check{width:23px;height:23px;border-radius:50%;border:2px solid #c7c7cc;background:transparent;cursor:pointer;flex:none;position:relative}
+.check.progress{border-color:var(--orange);background:linear-gradient(90deg,var(--orange) 50%,transparent 50%)}
+.check.done{background:var(--blue);border-color:var(--blue)}
+.check.done::after{content:"✓";position:absolute;color:#fff;font-size:14px;left:4px;top:0}
+.body{flex:1;min-width:0}
+.title{font-size:15px;font-weight:500;cursor:text;overflow-wrap:anywhere}
+.title.done{text-decoration:line-through;color:var(--muted)}
+.meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.badge{padding:1px 8px;border-radius:999px;background:var(--field);font-weight:600}
+.badge.progress{color:var(--orange)}
+.badge.done{color:var(--green)}
+.expired{color:var(--red);font-weight:600}
+.today{color:var(--orange);font-weight:600}
+.actions{display:flex;gap:4px}
+.icon{border:0;background:transparent;color:#aeaeb2;cursor:pointer;font-size:15px;border-radius:8px;padding:6px 8px}
+.icon:hover{color:var(--blue);background:var(--field)}
+.icon.del:hover{color:var(--red)}
+.edit{display:grid;grid-template-columns:1fr 120px 150px 140px;gap:8px;flex:1}
+.edit-actions{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}
+.empty{padding:18px 2px;color:var(--muted);font-size:14px}
+@media(max-width:720px){.form,.edit{grid-template-columns:1fr 1fr}.form input:first-child,.edit input:first-child{grid-column:1/-1}}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--line:#38383a;--field:#2c2c2e;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--muted:#98989d;--line:#38383a;--field:#2c2c2e;color-scheme:dark}
+
+h2{margin:26px 0 12px;font-size:22px;letter-spacing:-.4px;display:flex;align-items:center;justify-content:space-between}
+.proj-form{display:flex;gap:8px;margin-bottom:12px}
+.proj-form input{flex:1}
+.project{padding:6px 18px}
+.phead{display:flex;align-items:center;gap:10px;padding:12px 0}
+.chev{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:16px;width:24px;transition:transform .15s}
+.chev.open{transform:rotate(90deg)}
+.ptitle{font-size:17px;font-weight:600;cursor:text;overflow-wrap:anywhere}
+.ptitle.done{text-decoration:line-through;color:var(--muted)}
+.pcount{font-size:12px;color:var(--muted);margin-top:4px}
+.bar{height:4px;border-radius:2px;background:var(--field);margin-top:6px;overflow:hidden;width:180px}
+.bar>span{display:block;height:100%;background:var(--green)}
+.pbody{margin:0 0 8px 11px;padding:0 0 4px 24px;border-left:3px solid var(--blue)}
+.pbody .title{font-size:14px}
+.badge.tag{color:var(--blue)}
+.addsub{display:grid;grid-template-columns:1fr 110px 140px auto;gap:8px;padding:10px 0 6px}
+.pedit{display:flex;gap:8px;flex:1}
+.pedit input{flex:1}
+.icon.arm{color:var(--red);font-weight:600}
+@media(max-width:720px){.addsub{grid-template-columns:1fr 1fr}.addsub input:first-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <h1>TODO</h1>
+  <div id="summary" class="summary"></div>
+</header>
+
+<section class="card">
+  <form id="form" class="form">
+    <input id="text" maxlength="100" placeholder="Cosa devi fare?" autocomplete="off">
+    <select id="priority"><option>Normale</option><option>Alta</option></select>
+    <input id="deadline" type="date">
+    <button class="primary" type="submit">Aggiungi</button>
+  </form>
+  <div id="error" class="error"></div>
+</section>
+
+<h2>Attività</h2>
+<nav class="tabs" id="tabs"></nav>
+<section class="card" id="list"></section>
+
+<h2>Progetti</h2>
+<div class="proj-form">
+  <input id="ptext" maxlength="80" placeholder="Nome del nuovo progetto" autocomplete="off">
+  <button class="primary" id="paddbtn" type="button">Crea progetto</button>
+</div>
+<div id="perror" class="error"></div>
+<section id="projects"></section>
+</div>
+
+<script>
+const STATUS=["todo","progress","done"];
+const LABEL={todo:"Da fare",progress:"In corso",done:"Completata"};
+const FILTERS=[["all","Tutte"],["todo","Da fare"],["progress","In corso"],["done","Completate"]];
+const $=id=>document.getElementById(id);
+
+function load(key){
+  try{const v=JSON.parse(localStorage.getItem(key));return Array.isArray(v)?v:[]}catch(e){return []}
+}
+let tasks=load("todoSolo"),projects=load("todoProjects");
+let filter="all",editing=null,editIn="list",armed=null,focusNext=false,seq=0;
+const uid=()=>Date.now()*100+(seq++%100);
+
+function save(){
+  try{
+    localStorage.setItem("todoSolo",JSON.stringify(tasks));
+    localStorage.setItem("todoProjects",JSON.stringify(projects));
+  }catch(e){}
+}
+function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML.replace(/"/g,"&quot;")}
+function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fmt(date){
+  if(!date)return "Nessuna scadenza";
+  return "Scadenza "+new Date(date+"T12:00:00").toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"});
+}
+function dl(t){
+  if(t.status==="done"||!t.deadline)return "";
+  if(t.deadline<today())return "expired";
+  return t.deadline===today()?"today":"";
+}
+function opts(list,sel){return list.map(o=>`<option ${o===sel?"selected":""}>${o}</option>`).join("")}
+function findTask(id){
+  return tasks.find(t=>t.id===id)||projects.flatMap(p=>p.subtasks).find(t=>t.id===id);
+}
+function projectOf(id){return projects.find(p=>p.subtasks.some(s=>s.id===id))}
+function pool(){return tasks.concat(projects.flatMap(p=>p.subtasks))}
+function sortTasks(list){
+  return list.slice().sort((a,b)=>{
+    if((a.status==="done")!==(b.status==="done"))return a.status==="done"?1:-1;
+    return (a.deadline||"9999").localeCompare(b.deadline||"9999");
+  });
+}
+
+function render(){
+  const all=tasks.concat(projects.flatMap(p=>p.subtasks));
+  const open=all.filter(t=>t.status!=="done").length;
+  $("summary").textContent=all.length?open+" da completare su "+all.length:"";
+
+  $("tabs").innerHTML=FILTERS.map(([k,l])=>{
+    const n=k==="all"?pool().length:pool().filter(t=>t.status===k).length;
+    return `<button class="tab ${filter===k?"active":""}" data-filter="${k}">${l} ${n}</button>`;
+  }).join("");
+
+  const list=sortTasks(pool().filter(t=>filter==="all"||t.status===filter));
+  $("list").innerHTML=list.length?list.map(t=>t.id===editing&&editIn==="list"?editRow(t):row(t,true)).join(""):
+    `<div class="empty">Nessuna attività qui.</div>`;
+
+  $("projects").innerHTML=projects.length?projects.map(projectCard).join(""):
+    `<div class="card empty">Nessun progetto. Creane uno qui sopra.</div>`;
+
+  if(focusNext){
+    focusNext=false;
+    const i=document.querySelector("[data-f=title],[data-pf=title]");
+    if(i){i.focus();i.select()}
+  }
+}
+
+function row(t,tag){
+  return `<div class="task">
+    <button class="check ${t.status==="todo"?"":t.status}" data-cycle="${t.id}" title="Cambia stato: ${LABEL[t.status]}"></button>
+    <div class="body">
+      <div class="title ${t.status==="done"?"done":""}" data-edit="${t.id}" title="Doppio clic per modificare">${esc(t.title)}</div>
+      <div class="meta">
+        <span class="badge ${t.status}">${LABEL[t.status]}</span>${tag&&projectOf(t.id)?`<span class="badge tag">▸ ${esc(projectOf(t.id).title)}</span>`:""}
+        <span>${t.priority==="Alta"?"Alta priorità":"Priorità normale"}</span>
+        <span class="${dl(t)}">${fmt(t.deadline)}</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="icon" data-edit="${t.id}" title="Modifica">✎</button>
+      <button class="icon del ${armed===t.id?"arm":""}" data-del="${t.id}" title="Elimina">${armed===t.id?"Elimina?":"×"}</button>
+    </div>
+  </div>`;
+}
+
+function editRow(t){
+  return `<div class="task"><div class="edit" data-row="${t.id}">
+    <input data-f="title" maxlength="100" value="${esc(t.title)}">
+    <select data-f="priority">${opts(["Normale","Alta"],t.priority)}</select>
+    <input data-f="deadline" type="date" value="${esc(t.deadline||"")}">
+    <select data-f="status">${STATUS.map(s=>`<option value="${s}" ${s===t.status?"selected":""}>${LABEL[s]}</option>`).join("")}</select>
+    <div class="edit-actions">
+      <button class="ghost" data-cancel="1" type="button">Annulla</button>
+      <button class="primary" data-save="${t.id}" type="button">Salva</button>
+    </div>
+  </div></div>`;
+}
+
+function projectCard(p){
+  const n=p.subtasks.length,d=p.subtasks.filter(s=>s.status==="done").length;
+  const pid="p"+p.id;
+  const title=editing===pid
+    ? `<div class="pedit" data-prow="${p.id}">
+         <input data-pf="title" maxlength="80" value="${esc(p.title)}">
+         <button class="ghost" data-cancel="1" type="button">Annulla</button>
+         <button class="primary" data-psave="${p.id}" type="button">Salva</button>
+       </div>`
+    : `<div class="body">
+         <div class="ptitle ${p.done?"done":""}" data-pedit="${p.id}" title="Doppio clic per rinominare">${esc(p.title)}</div>
+         <div class="pcount">${n?d+" di "+n+" attività completate":"Nessuna attività"}${p.done?" · Progetto completato":""}</div>
+         ${n?`<div class="bar"><span style="width:${Math.round(d/n*100)}%"></span></div>`:""}
+       </div>`;
+  const body=p.open?`<div class="pbody">
+      ${n?sortTasks(p.subtasks).map(t=>t.id===editing&&editIn==="proj"?editRow(t):row(t)).join(""):`<div class="empty">Ancora nessuna attività.</div>`}
+      <div class="addsub" data-pid="${p.id}">
+        <input data-s="title" maxlength="100" placeholder="Nuova attività del progetto" autocomplete="off">
+        <select data-s="priority"><option>Normale</option><option>Alta</option></select>
+        <input data-s="deadline" type="date">
+        <button class="primary" data-addsub="${p.id}" type="button">Aggiungi</button>
+      </div>
+    </div>`:"";
+  return `<article class="card project">
+    <div class="phead">
+      <button class="chev ${p.open?"open":""}" data-ptoggle="${p.id}" title="${p.open?"Chiudi":"Apri"}">▸</button>
+      <button class="check ${p.done?"done":""}" data-pdone="${p.id}" title="Segna il progetto come fatto"></button>
+      ${title}
+      <div class="actions">
+        <button class="icon" data-pedit="${p.id}" title="Rinomina">✎</button>
+        <button class="icon del ${armed===pid?"arm":""}" data-pdel="${p.id}" title="Elimina progetto">${armed===pid?"Elimina?":"×"}</button>
+      </div>
+    </div>
+    ${body}
+  </article>`;
+}
+
+function commit(id){
+  const r=document.querySelector('[data-row="'+id+'"]'),t=findTask(id);
+  if(!r||!t)return;
+  const get=f=>r.querySelector('[data-f="'+f+'"]').value;
+  const title=get("title").trim();
+  if(!title){r.querySelector('[data-f="title"]').focus();return}
+  t.title=title.slice(0,100);t.priority=get("priority");t.deadline=get("deadline");t.status=get("status");
+  editing=null;save();render();
+}
+function commitProject(id){
+  const r=document.querySelector('[data-prow="'+id+'"]'),p=projects.find(x=>x.id===id);
+  if(!r||!p)return;
+  const title=r.querySelector("[data-pf=title]").value.trim();
+  if(!title)return;
+  p.title=title.slice(0,80);editing=null;save();render();
+}
+function addSub(pid){
+  const box=document.querySelector('[data-pid="'+pid+'"]'),p=projects.find(x=>x.id===pid);
+  if(!box||!p)return;
+  const g=f=>box.querySelector('[data-s="'+f+'"]');
+  const title=g("title").value.trim();
+  if(!title){g("title").focus();return}
+  p.subtasks.push({id:uid(),title:title.slice(0,100),priority:g("priority").value,deadline:g("deadline").value,status:"todo"});
+  save();render();
+  const again=document.querySelector('[data-pid="'+pid+'"] [data-s="title"]');
+  if(again)again.focus();
+}
+function addProject(){
+  const name=$("ptext").value.trim();
+  $("perror").textContent="";
+  if(!name){$("perror").textContent="Scrivi il nome del progetto.";return}
+  projects.unshift({id:uid(),title:name.slice(0,80),done:false,open:true,subtasks:[]});
+  $("ptext").value="";save();render();
+}
+
+$("form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const text=$("text").value.trim();
+  $("error").textContent="";
+  if(!text){$("error").textContent="Scrivi un’attività.";return}
+  tasks.push({id:uid(),title:text.slice(0,100),priority:$("priority").value,deadline:$("deadline").value,status:"todo"});
+  $("text").value="";$("deadline").value="";
+  save();render();
+});
+$("paddbtn").addEventListener("click",addProject);
+$("ptext").addEventListener("keydown",e=>{if(e.key==="Enter")addProject()});
+
+document.querySelector(".app").addEventListener("click",e=>{
+  const q=s=>e.target.closest(s);
+  const f=q("[data-filter]"),c=q("[data-cycle]"),d=q("[data-del]"),ed=q("button[data-edit]"),
+        s=q("[data-save]"),x=q("[data-cancel]"),pt=q("[data-ptoggle]"),pd=q("[data-pdone]"),
+        pe=q("button[data-pedit]"),ps=q("[data-psave]"),pdel=q("[data-pdel]"),as=q("[data-addsub]");
+  const wasArmed=armed;
+  armed=null;
+  if(f){filter=f.dataset.filter;render()}
+  else if(c){
+    const t=findTask(Number(c.dataset.cycle));
+    if(t)t.status=STATUS[(STATUS.indexOf(t.status)+1)%3];
+    save();render();
+  }else if(d){
+    const id=Number(d.dataset.del);
+    if(wasArmed!==id){armed=id;render();return}
+    tasks=tasks.filter(t=>t.id!==id);
+    projects.forEach(p=>{p.subtasks=p.subtasks.filter(t=>t.id!==id)});
+    if(editing===id)editing=null;
+    save();render();
+  }else if(ed){editing=Number(ed.dataset.edit);editIn=ed.closest("#projects")?"proj":"list";focusNext=true;render()}
+  else if(s){commit(Number(s.dataset.save))}
+  else if(x){editing=null;render()}
+  else if(pt){const p=projects.find(p=>p.id===Number(pt.dataset.ptoggle));if(p)p.open=!p.open;save();render()}
+  else if(pd){const p=projects.find(p=>p.id===Number(pd.dataset.pdone));if(p)p.done=!p.done;save();render()}
+  else if(pe){editing="p"+pe.dataset.pedit;focusNext=true;render()}
+  else if(ps){commitProject(Number(ps.dataset.psave))}
+  else if(pdel){
+    const id=Number(pdel.dataset.pdel);
+    if(wasArmed!=="p"+id){armed="p"+id;render();return}
+    projects=projects.filter(p=>p.id!==id);
+    save();render();
+  }else if(as){addSub(Number(as.dataset.addsub))}
+  else if(wasArmed!==null){render()}
+});
+
+document.querySelector(".app").addEventListener("dblclick",e=>{
+  const t=e.target.closest(".title[data-edit]"),p=e.target.closest(".ptitle[data-pedit]");
+  if(t){editing=Number(t.dataset.edit);editIn=t.closest("#projects")?"proj":"list";focusNext=true;render()}
+  else if(p){editing="p"+p.dataset.pedit;focusNext=true;render()}
+});
+
+document.querySelector(".app").addEventListener("keydown",e=>{
+  const r=e.target.closest("[data-row]"),pr=e.target.closest("[data-prow]"),sb=e.target.closest("[data-pid]");
+  if(r){
+    if(e.key==="Enter")commit(Number(r.dataset.row));
+    if(e.key==="Escape"){editing=null;render()}
+  }else if(pr){
+    if(e.key==="Enter")commitProject(Number(pr.dataset.prow));
+    if(e.key==="Escape"){editing=null;render()}
+  }else if(sb&&e.key==="Enter"&&e.target.matches("[data-s=title]")){
+    addSub(Number(sb.dataset.pid));
+  }
+});
+
+render();
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+</script>
+</body>
+</html>
