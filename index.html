@@ -18,7 +18,9 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue",Arial,sans-serif}
-.app{max-width:860px;margin:0 auto;padding:36px 24px 60px}
+.app{max-width:1180px;margin:0 auto;padding:36px 24px 60px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+.side{position:sticky;top:20px}
 header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
 h1{margin:0;font-size:36px;letter-spacing:-1.2px;font-weight:700}
 .summary{color:var(--muted);font-size:14px}
@@ -27,6 +29,14 @@ h1{margin:0;font-size:36px;letter-spacing:-1.2px;font-weight:700}
 .io{margin:-8px 0 14px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .io:empty{display:none}
 .io-err{color:var(--red)}
+.ver{margin-top:28px;text-align:center;font-size:12px;color:var(--muted)}
+.notes-card{padding:14px 18px;margin-bottom:0}
+.nh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.nh h3{margin:0;font-size:15px}
+.nh .ghost{padding:5px 10px;font-size:13px}
+.notes-card textarea{width:100%;min-height:300px;resize:vertical;border:0;background:var(--field);color:var(--text);border-radius:11px;padding:11px 12px;font:inherit;font-size:14px;line-height:1.45;outline:none}
+.notes-card textarea:focus{outline:3px solid rgba(0,122,255,.25)}
+@media(max-width:920px){.layout{grid-template-columns:1fr}.side{position:static}.notes-card textarea{min-height:160px}}
 .card{background:var(--card);border-radius:20px;padding:18px;box-shadow:0 2px 18px rgba(0,0,0,.04);margin-bottom:16px}
 input,select,button{font:inherit}
 input,select{border:0;background:var(--field);color:var(--text);border-radius:11px;padding:11px 12px;outline:none;min-width:0}
@@ -100,6 +110,8 @@ h2{margin:26px 0 12px;font-size:22px;letter-spacing:-.4px;display:flex;align-ite
   </div>
 </header>
 <div id="io" class="io"></div>
+<div class="layout">
+<div class="main">
 
 <section class="card">
   <form id="form" class="form">
@@ -122,6 +134,19 @@ h2{margin:26px 0 12px;font-size:22px;letter-spacing:-.4px;display:flex;align-ite
 </div>
 <div id="perror" class="error"></div>
 <section id="projects"></section>
+<div class="ver">Versione 7</div>
+</div>
+<aside class="side">
+  <section class="card notes-card">
+    <div class="nh">
+      <h3>Note e promemoria</h3>
+      <button class="ghost" id="bulbtn" type="button" title="Trasforma le righe selezionate in elenco puntato">• Elenco</button>
+    </div>
+    <textarea id="notes" maxlength="5000" placeholder="Appunti e cose da ricordare…
+Scrivi «- » a inizio riga per creare un elenco puntato."></textarea>
+  </section>
+</aside>
+</div>
 </div>
 
 <script>
@@ -133,7 +158,8 @@ const $=id=>document.getElementById(id);
 function load(key){
   try{const v=JSON.parse(localStorage.getItem(key));return Array.isArray(v)?v:[]}catch(e){return []}
 }
-let tasks=load("todoSolo"),projects=load("todoProjects");
+let tasks=load("todoSolo"),projects=load("todoProjects"),notes="";
+try{notes=localStorage.getItem("todoNotes")||""}catch(e){}
 let filter="all",editing=null,editIn="list",armed=null,focusNext=false,seq=0;
 const uid=()=>Date.now()*100+(seq++%100);
 
@@ -141,6 +167,7 @@ function save(){
   try{
     localStorage.setItem("todoSolo",JSON.stringify(tasks));
     localStorage.setItem("todoProjects",JSON.stringify(projects));
+    localStorage.setItem("todoNotes",notes);
   }catch(e){}
 }
 function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML.replace(/"/g,"&quot;")}
@@ -161,10 +188,17 @@ function findTask(id){
 }
 function projectOf(id){return projects.find(p=>p.subtasks.some(s=>s.id===id))}
 function pool(){return tasks.concat(projects.flatMap(p=>p.subtasks))}
+function setStatus(t,s){
+  if(t.status===s)return;
+  t.status=s;
+  if(s==="done")t.doneAt=Date.now();else delete t.doneAt;
+}
 function sortTasks(list){
+  const rank={todo:0,progress:1,done:2};
   return list.slice().sort((a,b)=>{
-    if((a.status==="done")!==(b.status==="done"))return a.status==="done"?1:-1;
-    return (a.deadline||"9999").localeCompare(b.deadline||"9999");
+    if(rank[a.status]!==rank[b.status])return rank[a.status]-rank[b.status];
+    if(a.status==="done")return (b.doneAt||0)-(a.doneAt||0)||b.id-a.id;
+    return (a.deadline||"9999").localeCompare(b.deadline||"9999")||a.id-b.id;
   });
 }
 
@@ -266,7 +300,7 @@ function commit(id){
   const get=f=>r.querySelector('[data-f="'+f+'"]').value;
   const title=get("title").trim();
   if(!title){r.querySelector('[data-f="title"]').focus();return}
-  t.title=title.slice(0,100);t.priority=get("priority");t.deadline=get("deadline");t.status=get("status");
+  t.title=title.slice(0,100);t.priority=get("priority");t.deadline=get("deadline");setStatus(t,get("status"));
   editing=null;save();render();
 }
 function commitProject(id){
@@ -313,12 +347,14 @@ function normTask(t){
     title:t.title.trim().slice(0,100),
     priority:t.priority==="Alta"?"Alta":"Normale",
     deadline:/^\d{4}-\d{2}-\d{2}$/.test(t.deadline||"")?t.deadline:"",
-    status:STATUS.includes(t.status)?t.status:(t.done?"done":"todo")
+    status:STATUS.includes(t.status)?t.status:(t.done?"done":"todo"),
+    doneAt:Number.isFinite(t.doneAt)?t.doneAt:0
   };
 }
 function normData(d){
   if(!d||typeof d!=="object"||!Array.isArray(d.tasks)||!Array.isArray(d.projects))return null;
   return {
+    notes:typeof d.notes==="string"?d.notes.slice(0,5000):undefined,
     tasks:d.tasks.map(normTask).filter(Boolean),
     projects:d.projects.filter(p=>p&&typeof p.title==="string"&&p.title.trim()).map(p=>({
       id:Number.isFinite(p.id)?p.id:uid(),
@@ -330,7 +366,7 @@ function normData(d){
   };
 }
 async function exportData(){
-  const data=JSON.stringify({app:"todo",version:1,exportedAt:new Date().toISOString(),tasks:tasks,projects:projects},null,2);
+  const data=JSON.stringify({app:"todo",version:1,exportedAt:new Date().toISOString(),tasks:tasks,projects:projects,notes:notes},null,2);
   const name="todo-backup-"+today()+".json";
   let dn=null;
   try{if(window.claude&&window.claude.use)dn=await window.claude.use("downloads")}catch(e){}
@@ -367,10 +403,52 @@ $("io").addEventListener("click",e=>{
   if(!b)return;
   if(b.dataset.io==="apply"&&pending){
     tasks=pending.tasks;projects=pending.projects;editing=null;armed=null;
+    if(typeof pending.notes==="string"){notes=pending.notes;$("notes").value=notes}
     pending=null;save();render();ioMsg("Dati importati.");
   }else{pending=null;ioMsg("")}
 });
 
+$("notes").value=notes;
+const BUL="• ";
+$("notes").addEventListener("input",e=>{
+  const ta=e.target;
+  if(e.inputType==="insertText"){
+    const pos=ta.selectionStart,start=ta.value.lastIndexOf("\n",pos-1)+1;
+    const m=ta.value.slice(start,pos).match(/^(\s*)[-*] $/);
+    if(m)ta.setRangeText(m[1]+BUL,start,pos,"end");
+  }
+  notes=ta.value.slice(0,5000);save();
+});
+$("notes").addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||e.shiftKey||e.isComposing)return;
+  const ta=e.target,pos=ta.selectionStart;
+  if(pos!==ta.selectionEnd)return;
+  const start=ta.value.lastIndexOf("\n",pos-1)+1;
+  const line=ta.value.slice(start,pos);
+  const m=line.match(/^(\s*)• /);
+  if(!m)return;
+  e.preventDefault();
+  if(line===m[0])ta.setRangeText("",start,pos,"end");
+  else ta.setRangeText("\n"+m[1]+BUL,pos,pos,"end");
+  ta.dispatchEvent(new Event("input"));
+});
+$("bulbtn").addEventListener("click",()=>{
+  const ta=$("notes"),v=ta.value;
+  const s=v.lastIndexOf("\n",ta.selectionStart-1)+1;
+  let en=v.indexOf("\n",ta.selectionEnd);
+  if(en<0)en=v.length;
+  const lines=v.slice(s,en).split("\n");
+  const filled=lines.filter(l=>l.trim());
+  const allB=filled.length>0&&filled.every(l=>/^\s*• /.test(l));
+  const out=lines.map(l=>{
+    if(allB)return l.replace(/^(\s*)• /,"$1");
+    if(/^\s*• /.test(l)||(!l.trim()&&lines.length>1))return l;
+    return l.replace(/^(\s*)/,"$1"+BUL);
+  }).join("\n");
+  ta.setRangeText(out,s,en,lines.length>1?"select":"end");
+  ta.focus();
+  ta.dispatchEvent(new Event("input"));
+});
 $("paddbtn").addEventListener("click",addProject);
 $("ptext").addEventListener("keydown",e=>{if(e.key==="Enter")addProject()});
 
@@ -384,7 +462,7 @@ document.querySelector(".app").addEventListener("click",e=>{
   if(f){filter=f.dataset.filter;render()}
   else if(c){
     const t=findTask(Number(c.dataset.cycle));
-    if(t)t.status=STATUS[(STATUS.indexOf(t.status)+1)%3];
+    if(t)setStatus(t,STATUS[(STATUS.indexOf(t.status)+1)%3]);
     save();render();
   }else if(d){
     const id=Number(d.dataset.del);
